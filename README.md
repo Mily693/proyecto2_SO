@@ -5,18 +5,18 @@ Este proyecto es una herramienta de simulación con una interfaz gráfica (GUI) 
 ## Características
 - **Gestión de Procesos:**
   Cada proceso incluye:
-  - PID: Identificador numérico único generado automáticamente.
-  - Nombre: Nombre del proceso.
-  - Tiempo en CPU: Cantidad de unidades de tiempo necesarias para ejecutarse.
-  - Instante de llegada: Momento en que el proceso entra al sistema.
-  - Quantum de tiempo: Tiempo asignado para el algoritmo Round Robin.
+  - **PID:** Identificador numérico único generado automáticamente.
+  - **Nombre:** Nombre del proceso.
+  - **Tiempo en CPU:** Cantidad de unidades de tiempo necesarias para ejecutarse.
+  - **Instante de llegada:** Momento en que el proceso entra al sistema.
+  - **Quantum de tiempo:** Tiempo asignado para el algoritmo Round Robin.
 
 
 - **Algoritmos de Planificación:**
-    - FCFS (First Come, First Served) – No expropiativo.
-    - SJF (Shortest Job First) – No expropiativo.
-    - SRTF (Shortest Remaining Time First) – Expropiativo.
-    - Round Robin – Expropiativo, con quantum configurable.
+    - **FCFS** (First Come, First Served) – No expropiativo.
+    - **SJF** (Shortest Job First) – No expropiativo.
+    - **SRTF** (Shortest Remaining Time First) – Expropiativo.
+    - **Round Robin** – Expropiativo, con quantum configurable.
 
 - **Métricas de Rendimiento:**
     - Tiempo de Retorno Promedio
@@ -41,27 +41,27 @@ Este proyecto es una herramienta de simulación con una interfaz gráfica (GUI) 
 - Para ejecutar este proyecto, necesitas tener Python instalado. 
 - Adicionalmente, debes instalar la librería `matplotlib`.
 
-**Estructura del Proyecto:**
+## Estructura del Proyecto:
 
-    - main.py: Contiene la interfaz gráfica de usuario (GUI) y la lógica principal de la aplicación.
+  - **main.py:** Contiene la interfaz gráfica de usuario (GUI) y la lógica principal de la aplicación.
 
-    - simulador.py: Contiene la lógica de los algoritmos de planificación y el cálculo de las métricas.
+  - **simulador.py:** Contiene la lógica de los algoritmos de planificación y el cálculo de las métricas.
 
-    - proceso.py: Define la clase Proceso utilizada para representar cada proceso en la simulación.
+  - **proceso.py:** Define la clase Proceso utilizada para representar cada proceso en la simulación.
 
 ## Uso
 
-1. Agregar procesos:
-   • Ingresa nombre, tiempo en CPU, instante de llegada y quantum (si aplica).
-   • Los procesos reciben automáticamente un PID único.
+**1. Agregar procesos:**
+  - Ingresa nombre, tiempo en CPU, instante de llegada y quantum (si aplica).
+  - Los procesos reciben automáticamente un PID único.
 
-2. Seleccionar algoritmo de planificación:
-   • Elige entre FCFS, SJF, SRTF o Round Robin.
+**2. Seleccionar algoritmo de planificación:**
+  - Elige entre FCFS, SJF, SRTF o Round Robin.
 
-3. Iniciar simulación:
-   • Presiona el botón Iniciar Simulación.
-   • Se mostrará en pantalla la cola de procesos y su orden de ejecución.
+**3. Iniciar simulación:**
+  - Presiona el botón Iniciar Simulación.
+  - Se mostrará en pantalla la cola de procesos y su orden de ejecución.
 
-4. Observar resultados:
-   • Visualiza la ejecución en tiempo discreto (cada unidad = 5 segundos).
-   • Revisa el historial de procesos finalizados.
+**4. Observar resultados:**
+  - Visualiza la ejecución en tiempo discreto (cada unidad = 5 segundos).
+  - Revisa el historial de procesos finalizados.
