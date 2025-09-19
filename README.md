@@ -41,7 +41,7 @@ Este proyecto es una herramienta de simulación con una interfaz gráfica (GUI) 
 - Para ejecutar este proyecto, necesitas tener Python instalado. 
 - Adicionalmente, debes instalar la librería `matplotlib`.
 
-## Estructura del Proyecto:
+## Estructura del Proyecto
 
   - **main.py:** Contiene la interfaz gráfica de usuario (GUI) y la lógica principal de la aplicación.
 
@@ -65,3 +65,4 @@ Este proyecto es una herramienta de simulación con una interfaz gráfica (GUI) 
 **4. Observar resultados:**
   - Visualiza la ejecución en tiempo discreto (cada unidad = 5 segundos).
   - Revisa el historial de procesos finalizados.
+<img width="1354" height="724" alt="Captura de pantalla (693)" src="https://github.com/user-attachments/assets/8802bf2a-f8d5-41cd-93b3-6dc0b54e797d" />
