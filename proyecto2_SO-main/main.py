@@ -206,4 +206,5 @@ class SimuladorApp:
         
         self.simulaciones_historial[algoritmo_actual] = tiempos_espera
         
+        
         self.ax_hist.clear()
