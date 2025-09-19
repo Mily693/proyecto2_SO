@@ -47,7 +47,7 @@ simulador.py: Contiene la lógica de los algoritmos de planificación y el cálc
 
 proceso.py: Define la clase Proceso utilizada para representar cada proceso en la simulación.
 
-**Uso:**
+## Uso
 
 1. Agregar procesos:
    • Ingresa nombre, tiempo en CPU, instante de llegada y quantum (si aplica).
