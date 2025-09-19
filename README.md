@@ -3,7 +3,7 @@
 Este proyecto es una herramienta de simulación con una interfaz gráfica (GUI) para visualizar y comparar el rendimiento de diferentes algoritmos de planificación de procesos en sistemas operativos. Implementa distintos algoritmos de planificación de CPU, tanto expropiativos como no expropiativos. El objetivo es simular cómo un sistema operativo gestiona la cola de procesos y asigna la CPU según la política de planificación seleccionada.
 
 ## Características
-- Gestión de Procesos
+- **Gestión de Procesos:**
   Cada proceso incluye:
   - PID: Identificador numérico único generado automáticamente.
   - Nombre: Nombre del proceso.
@@ -23,13 +23,13 @@ Este proyecto es una herramienta de simulación con una interfaz gráfica (GUI) 
     - Tiempo de Espera Promedio
 
 - **Simulación en Tiempo Discreto:**
-  • Una CPU disponible para ejecutar procesos.
-  • Cada unidad de tiempo equivale a 5 segundos reales.
+  - Una CPU disponible para ejecutar procesos.
+  - Cada unidad de tiempo equivale a 5 segundos reales.
 
 - **Interfaz de Usuario:**
-  • Permite agregar procesos antes de iniciar la simulación.
-  • Botón para iniciar simulación según el algoritmo seleccionado.
-  • Visualización de la cola de procesos y el historial de ejecución.
+  - Permite agregar procesos antes de iniciar la simulación.
+  - Botón para iniciar simulación según el algoritmo seleccionado.
+  - Visualización de la cola de procesos y el historial de ejecución.
 
 - **Visualización:**
     - Diagrama de Gantt animado que muestra la ejecución de los procesos en la CPU.
@@ -38,14 +38,16 @@ Este proyecto es una herramienta de simulación con una interfaz gráfica (GUI) 
 
 ## Requisitos
 
-Para ejecutar este proyecto, necesitas tener Python instalado. Adicionalmente, debes instalar la librería `matplotlib`.
+- Para ejecutar este proyecto, necesitas tener Python instalado. 
+- Adicionalmente, debes instalar la librería `matplotlib`.
 
 **Estructura del Proyecto:**
-main.py: Contiene la interfaz gráfica de usuario (GUI) y la lógica principal de la aplicación.
 
-simulador.py: Contiene la lógica de los algoritmos de planificación y el cálculo de las métricas.
+    - main.py: Contiene la interfaz gráfica de usuario (GUI) y la lógica principal de la aplicación.
 
-proceso.py: Define la clase Proceso utilizada para representar cada proceso en la simulación.
+    - simulador.py: Contiene la lógica de los algoritmos de planificación y el cálculo de las métricas.
+
+    - proceso.py: Define la clase Proceso utilizada para representar cada proceso en la simulación.
 
 ## Uso
 
