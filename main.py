@@ -208,3 +208,87 @@ class SimuladorApp:
         
         
         self.ax_hist.clear()
+
+        algoritmos_graficar = list(self.simulaciones_historial.keys())
+        tiempos_por_algoritmo = [self.simulaciones_historial[alg] for alg in algoritmos_graficar]
+
+        if tiempos_por_algoritmo and any(tiempos_por_algoritmo):
+            self.ax_hist.hist(tiempos_por_algoritmo, bins=5, label=algoritmos_graficar, color=[self.colores_procesos.get(alg, self.generar_color_aleatorio()) for alg in algoritmos_graficar], edgecolor='black')
+        else:
+            self.ax_hist.text(0.5, 0.5, 'No hay datos para mostrar', ha='center', va='center', transform=self.ax_hist.transAxes)
+        
+        self.ax_hist.set_title("Comparación de Tiempos de Espera")
+        self.ax_hist.set_xlabel("Tiempo de Espera")
+        self.ax_hist.set_ylabel("Frecuencia")
+        self.ax_hist.legend(loc='best')
+        self.fig.canvas.draw()
+        
+    def crear_widgets(self):
+        main_frame = ttk.Frame(self.master, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        frame_crear_proceso = ttk.LabelFrame(main_frame, text="Añadir Nuevo Proceso", padding="10")
+        frame_crear_proceso.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+
+        ttk.Label(frame_crear_proceso, text="Nombre:").grid(row=0, column=0, padx=2, pady=2, sticky="w")
+        self.entry_nombre = ttk.Entry(frame_crear_proceso)
+        self.entry_nombre.grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        
+        ttk.Label(frame_crear_proceso, text="Tiempo CPU:").grid(row=0, column=2, padx=2, pady=2, sticky="w")
+        self.entry_tiempo_cpu = ttk.Entry(frame_crear_proceso)
+        self.entry_tiempo_cpu.grid(row=0, column=3, padx=2, pady=2, sticky="ew")
+
+        ttk.Label(frame_crear_proceso, text="Llegada:").grid(row=0, column=4, padx=2, pady=2, sticky="w")
+        self.entry_instante_llegada = ttk.Entry(frame_crear_proceso)
+        self.entry_instante_llegada.grid(row=0, column=5, padx=2, pady=2, sticky="ew")
+
+        ttk.Button(frame_crear_proceso, text="Añadir Proceso", command=self.anadir_proceso).grid(row=0, column=6, padx=10, pady=2)
+        
+        frame_algoritmo = ttk.LabelFrame(main_frame, text="Configuración de Simulación", padding="10")
+        frame_algoritmo.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+
+        algoritmos = ["FCFS", "SJF", "SRTF", "Round Robin"]
+        self.algoritmo_var.set(algoritmos[0])
+        
+        ttk.Label(frame_algoritmo, text="Algoritmo:").grid(row=0, column=0, padx=2, pady=2, sticky="w")
+        opcion_menu_algoritmo = ttk.OptionMenu(frame_algoritmo, self.algoritmo_var, algoritmos[0], *algoritmos)
+        opcion_menu_algoritmo.grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        
+        ttk.Label(frame_algoritmo, text="Quantum (RR):").grid(row=0, column=2, padx=2, pady=2, sticky="w")
+        ttk.Entry(frame_algoritmo, textvariable=self.quantum, width=5).grid(row=0, column=3, padx=2, pady=2, sticky="ew")
+        
+        ttk.Button(frame_algoritmo, text="Iniciar Simulación", command=self.iniciar_simulacion).grid(row=0, column=4, padx=10, pady=2)
+        
+        frame_listas = ttk.Frame(main_frame)
+        frame_listas.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
+        main_frame.grid_rowconfigure(2, weight=1)
+
+        ttk.Label(frame_listas, text="Cola de Procesos Listos").pack(pady=2)
+        self.lista_procesos_cola = tk.Listbox(frame_listas, height=15, width=50)
+        self.lista_procesos_cola.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
+        
+        ttk.Label(frame_listas, text="Historial de Procesos Ejecutados").pack(pady=2)
+        self.lista_procesos_historial = tk.Listbox(frame_listas, height=15)
+        self.lista_procesos_historial.pack(fill=tk.BOTH, expand=True, padx=5, pady=2)
+        
+        frame_metricas_y_gantt = ttk.Frame(main_frame)
+        frame_metricas_y_gantt.grid(row=2, column=1, padx=5, pady=5, sticky="nsew")
+        main_frame.grid_columnconfigure(1, weight=1)
+        
+        ttk.Label(frame_metricas_y_gantt, text="Métricas de Rendimiento", font=('Arial', 10, 'bold')).pack(pady=(5,2))
+        self.label_tiempo_retorno_promedio = ttk.Label(frame_metricas_y_gantt, text="Tiempo de Retorno Promedio: 0.00")
+        self.label_tiempo_retorno_promedio.pack(pady=1, anchor="w")
+        
+        self.label_tiempo_espera_promedio = ttk.Label(frame_metricas_y_gantt, text="Tiempo de Espera Promedio: 0.00")
+        self.label_tiempo_espera_promedio.pack(pady=1, anchor="w")
+
+        ttk.Label(frame_metricas_y_gantt, text="Diagrama de Gantt", font=('Arial', 10, 'bold')).pack(pady=(10, 5))
+        
+        self.canvas_gantt = FigureCanvasTkAgg(self.fig, master=frame_metricas_y_gantt)
+        self.canvas_gantt_widget = self.canvas_gantt.get_tk_widget()
+        self.canvas_gantt_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = SimuladorApp(root)
+    root.mainloop()
