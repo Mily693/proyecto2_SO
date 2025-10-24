@@ -1,0 +1,626 @@
+Clases para el proyecto de Sistemas operativos
+
+Clase main
+# main.py (SimuladorApp)
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import random
+import numpy as np
+# Importamos la clase Simulador (que a su vez importa Proceso)
+from simulador import Simulador 
+
+class SimuladorApp:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Simulador de Procesos")
+        self.simulador = Simulador()
+        self.simulaciones_historial = {}
+
+        self.algoritmo_var = tk.StringVar(self.master)
+        self.quantum = tk.IntVar(self.master, value=4) # Valor inicial para RR
+
+        self.label_tiempo_retorno_promedio = None
+        self.label_tiempo_espera_promedio = None
+        self.label_indice_servicio_promedio = None # Nuevo label
+        
+        self.colores_procesos = {}
+
+        # Ajuste de tamaño de figura para acomodar el Gantt y el Histograma
+        self.fig, (self.ax_gantt, self.ax_hist) = plt.subplots(2, 1, figsize=(8, 4.5))
+        self.fig.tight_layout(pad=3.0) # Espacio entre subplots
+
+        self.instante_actual_animacion = 0
+        self.historial_visual_keys = []
+        self.animation_id = None
+        
+        self.treeview_metricas_por_proceso = None
+
+        self.crear_widgets()
+
+    def generar_color_aleatorio(self):
+        return "#%06x" % random.randint(0, 0xFFFFFF)
+
+    def anadir_proceso(self):
+        try:
+            nombre = self.entry_nombre.get()
+            tiempo_cpu = int(self.entry_tiempo_cpu.get())
+            instante_llegada = int(self.entry_instante_llegada.get())
+
+            if not nombre or tiempo_cpu <= 0 or instante_llegada < 0:
+                messagebox.showwarning("Advertencia", "Datos no válidos.")
+                return
+
+            self.simulador.agregar_proceso(nombre, tiempo_cpu, instante_llegada)
+            self.actualizar_visualizacion_lista_procesos()
+
+            self.entry_nombre.delete(0, tk.END)
+            self.entry_tiempo_cpu.delete(0, tk.END)
+            self.entry_instante_llegada.delete(0, tk.END)
+
+        except ValueError:
+            messagebox.showerror("Error", "Ingrese valores numéricos válidos.")
+
+    def actualizar_visualizacion_lista_procesos(self):
+        self.lista_procesos_cola.delete(0, tk.END)
+        for proceso in self.simulador.cola_llegadas:
+            # Usar tiempo_cpu_total para mostrar el valor original
+            self.lista_procesos_cola.insert(tk.END, f"PID: {proceso.pid} - Nombre: {proceso.nombre} - CPU: {proceso.tiempo_cpu_total} - Llegada: {proceso.instante_llegada}")
+    
+    def iniciar_simulacion(self):
+        if not self.simulador.cola_llegadas:
+            messagebox.showwarning("Advertencia", "Añade al menos un proceso.")
+            return
+
+        if self.animation_id:
+            self.master.after_cancel(self.animation_id)
+
+        algoritmo = self.algoritmo_var.get()
+        
+        # Ejecución del algoritmo
+        if algoritmo == "FCFS":
+            self.simulador.ejecutar_fcfs()
+        elif algoritmo == "SJF":
+            self.simulador.ejecutar_sjf()
+        elif algoritmo == "SRTF":
+            self.simulador.ejecutar_srtf()
+        elif algoritmo == "Round Robin":
+            quantum_valor = self.quantum.get()
+            if quantum_valor <= 0:
+                messagebox.showwarning("Advertencia", "El quantum debe ser positivo.")
+                return
+            self.simulador.ejecutar_round_robin(quantum_valor)
+        
+        # Post-simulación
+        self.asignar_colores_procesos()
+        self.actualizar_tabla_metricas()
+        self.actualizar_metricas_ui()
+        self.actualizar_histograma()
+        
+        # Reiniciar y empezar la visualización del Gantt
+        self.instante_actual_animacion = 0
+        self.historial_visual_keys = sorted(list(self.simulador.historial_ejecucion_visual.keys()))
+        self.dibujar_gantt_estatico()
+        self.iniciar_animacion_gantt()
+        
+    def asignar_colores_procesos(self):
+        nombres_procesos = set(self.simulador.historial_ejecucion_visual.values())
+        
+        if "Inactivo" in nombres_procesos:
+            self.colores_procesos["Inactivo"] = "#D3D3D3" # Gris claro
+            nombres_procesos.remove("Inactivo")
+        
+        for nombre in sorted(list(nombres_procesos)):
+            if nombre not in self.colores_procesos:
+                self.colores_procesos[nombre] = self.generar_color_aleatorio()
+
+    def dibujar_gantt_estatico(self):
+        self.ax_gantt.clear()
+        algoritmo = self.algoritmo_var.get()
+        self.ax_gantt.set_title(f'Diagrama de Gantt - {algoritmo}')
+        self.ax_gantt.set_xlabel('Tiempo')
+        self.ax_gantt.set_yticks([0.5])
+        self.ax_gantt.set_yticklabels(['CPU'])
+        self.ax_gantt.set_ylim(0, 1)
+
+        tiempos = sorted(self.simulador.historial_ejecucion_visual.keys())
+        if not tiempos:
+            self.fig.canvas.draw()
+            return
+
+        inicio_segmento = tiempos[0]
+        proceso_anterior = self.simulador.historial_ejecucion_visual.get(inicio_segmento)
+        
+        for i in range(1, len(tiempos)):
+            tiempo_actual = tiempos[i]
+            proceso_actual = self.simulador.historial_ejecucion_visual.get(tiempo_actual)
+            
+            if proceso_actual != proceso_anterior:
+                self._dibujar_segmento(proceso_anterior, inicio_segmento, tiempo_actual)
+                inicio_segmento = tiempo_actual
+                proceso_anterior = proceso_actual
+        
+        # Dibujar el último segmento
+        fin_total = max(tiempos) + 1
+        self._dibujar_segmento(proceso_anterior, inicio_segmento, fin_total)
+
+        # Configurar límites y ticks
+        self.ax_gantt.set_xlim(0, fin_total)
+        self.ax_gantt.set_xticks(np.arange(0, fin_total + 1, 1))
+
+        # Dibujar líneas temporales de finalización (solo al final del estático)
+        for proceso in self.simulador.historial_ejecucion:
+            color = self.colores_procesos.get(proceso.nombre, 'gray')
+            self.ax_gantt.axvline(x=proceso.tiempo_finalizacion, color=color, linestyle='--', linewidth=1, zorder=1)
+            # Etiqueta de finalización
+            self.ax_gantt.text(proceso.tiempo_finalizacion, 0.7, f'F:{proceso.tiempo_finalizacion}', 
+                               rotation=90, va='center', ha='left', fontsize=6, color=color)
+
+        self.fig.canvas.draw()
+        
+    def _dibujar_segmento(self, nombre_proceso, inicio_tiempo, fin_tiempo):
+        if inicio_tiempo is None or fin_tiempo is None or nombre_proceso is None:
+            return
+
+        duracion = fin_tiempo - inicio_tiempo
+        color = self.colores_procesos.get(nombre_proceso, 'gray')
+        
+        self.ax_gantt.barh(0.5, duracion, left=inicio_tiempo, height=0.5, 
+                             color=color, edgecolor='black', zorder=3)
+        
+        # Texto del proceso en el centro del segmento
+        if duracion >= 1.0 and nombre_proceso != "Inactivo":
+            self.ax_gantt.text(inicio_tiempo + duracion / 2, 0.5, nombre_proceso, 
+                                 ha='center', va='center', color='white', fontsize=8, zorder=4)
+
+    def iniciar_animacion_gantt(self):
+        # Esta función solo actualizará la línea de tiempo sobre el Gantt estático
+        if not self.historial_visual_keys or self.instante_actual_animacion > max(self.historial_visual_keys):
+            return
+
+        tiempo_actual_en_simulacion = self.historial_visual_keys[self.instante_actual_animacion]
+        
+        # Redibujar la línea de tiempo (roja y punteada)
+        self.ax_gantt.lines = [] # Limpiar líneas (si hay alguna línea de tiempo anterior)
+        self.ax_gantt.axvline(x=tiempo_actual_en_simulacion, color='red', linestyle='--', linewidth=1, zorder=5)
+
+        # Etiqueta de tiempo (roja)
+        self.ax_gantt.texts = [t for t in self.ax_gantt.texts if not t.get_color() == 'red'] # Limpiar labels rojos
+        self.ax_gantt.text(tiempo_actual_en_simulacion, 1.05, f't={tiempo_actual_en_simulacion}', 
+                           ha='center', va='bottom', fontsize=8, color='red', zorder=5)
+        
+        self.fig.canvas.draw()
+        
+        self.instante_actual_animacion += 1
+        self.animation_id = self.master.after(500, self.iniciar_animacion_gantt) # Velocidad de animación
+        
+    def actualizar_metricas_ui(self):
+        # [CORRECCIÓN CLAVE]: Recibir los 3 valores de calcular_metricas
+        promedio_retorno, promedio_espera, promedio_indice_servicio = self.simulador.calcular_metricas()
+            
+        self.label_tiempo_retorno_promedio.config(text=f"Tiempo de Retorno Promedio: {promedio_retorno:.2f}")
+        self.label_tiempo_espera_promedio.config(text=f"Tiempo de Espera Promedio: {promedio_espera:.2f}")
+        self.label_indice_servicio_promedio.config(text=f"Índice de Servicio Promedio: {promedio_indice_servicio:.2f}")
+
+    def actualizar_histograma(self):
+        algoritmo_actual = self.algoritmo_var.get()
+        self.simulador.calcular_metricas() 
+        tiempos_espera = [p.tiempo_espera for p in self.simulador.historial_ejecucion]
+        
+        self.simulaciones_historial[algoritmo_actual] = tiempos_espera
+        
+        self.ax_hist.clear()
+        
+        algoritmos_graficar = list(self.simulaciones_historial.keys())
+        hist_data = [self.simulaciones_historial[alg] for alg in algoritmos_graficar if self.simulaciones_historial[alg]]
+        hist_labels = [alg for alg in algoritmos_graficar if self.simulaciones_historial[alg]]
+        
+        colores_hist = [self.colores_procesos.get(alg, self.generar_color_aleatorio()) for alg in hist_labels]
+        
+        if hist_data:
+            self.ax_hist.hist(hist_data, bins=5, label=hist_labels, color=colores_hist, edgecolor='black', alpha=0.7, 
+                              range=(0, max(max(t) for t in hist_data) + 1 if hist_data else 1))
+
+        self.ax_hist.set_title("Comparación de Tiempos de Espera")
+        self.ax_hist.set_xlabel("Tiempo de Espera")
+        self.ax_hist.set_ylabel("Frecuencia")
+        if hist_labels:
+            self.ax_hist.legend(loc='best')
+            
+        self.fig.canvas.draw()
+        
+    def actualizar_tabla_metricas(self):
+        for item in self.treeview_metricas_por_proceso.get_children():
+            self.treeview_metricas_por_proceso.delete(item)
+
+        self.simulador.calcular_metricas()
+        
+        self.lista_procesos_historial.delete(0, tk.END)
+        
+        for proceso in self.simulador.historial_ejecucion:
+            self.treeview_metricas_por_proceso.insert('', tk.END, values=(
+                proceso.nombre,
+                proceso.instante_llegada,
+                proceso.tiempo_cpu_total,
+                proceso.tiempo_finalizacion,
+                proceso.tiempo_retorno,
+                proceso.tiempo_espera,
+                f"{proceso.indice_servicio:.2f}"
+            ))
+            self.lista_procesos_historial.insert(tk.END, f"PID: {proceso.pid} - Nombre: {proceso.nombre} - Tiempo Final: {proceso.tiempo_finalizacion}")
+
+    def crear_widgets(self):
+        main_frame = ttk.Frame(self.master, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        main_frame.grid_columnconfigure(0, weight=0) # Fila de Listas (fija)
+        main_frame.grid_columnconfigure(1, weight=1) # Fila de Gráficas (expansible)
+
+        # --- Fila 0: Creación de Procesos ---
+        frame_crear_proceso = ttk.LabelFrame(main_frame, text="Añadir Nuevo Proceso", padding="10")
+        frame_crear_proceso.grid(row=0, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+        frame_crear_proceso.grid_columnconfigure(1, weight=1)
+        frame_crear_proceso.grid_columnconfigure(3, weight=1)
+        frame_crear_proceso.grid_columnconfigure(5, weight=1)
+
+        ttk.Label(frame_crear_proceso, text="Nombre:").grid(row=0, column=0, padx=2, pady=2, sticky="w")
+        self.entry_nombre = ttk.Entry(frame_crear_proceso)
+        self.entry_nombre.grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        
+        ttk.Label(frame_crear_proceso, text="Tiempo CPU:").grid(row=0, column=2, padx=2, pady=2, sticky="w")
+        self.entry_tiempo_cpu = ttk.Entry(frame_crear_proceso)
+        self.entry_tiempo_cpu.grid(row=0, column=3, padx=2, pady=2, sticky="ew")
+
+        ttk.Label(frame_crear_proceso, text="Llegada:").grid(row=0, column=4, padx=2, pady=2, sticky="w")
+        self.entry_instante_llegada = ttk.Entry(frame_crear_proceso)
+        self.entry_instante_llegada.grid(row=0, column=5, padx=2, pady=2, sticky="ew")
+
+        ttk.Button(frame_crear_proceso, text="Añadir Proceso", command=self.anadir_proceso).grid(row=0, column=6, padx=10, pady=2)
+        
+        # --- Fila 1: Configuración de Simulación ---
+        frame_algoritmo = ttk.LabelFrame(main_frame, text="Configuración de Simulación", padding="10")
+        frame_algoritmo.grid(row=1, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+
+        algoritmos = ["FCFS", "SJF", "SRTF", "Round Robin"]
+        self.algoritmo_var.set(algoritmos[0])
+        
+        ttk.Label(frame_algoritmo, text="Algoritmo:").grid(row=0, column=0, padx=2, pady=2, sticky="w")
+        opcion_menu_algoritmo = ttk.OptionMenu(frame_algoritmo, self.algoritmo_var, algoritmos[0], *algoritmos)
+        opcion_menu_algoritmo.grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        
+        ttk.Label(frame_algoritmo, text="Quantum (RR):").grid(row=0, column=2, padx=2, pady=2, sticky="w")
+        ttk.Entry(frame_algoritmo, textvariable=self.quantum, width=5).grid(row=0, column=3, padx=2, pady=2, sticky="ew")
+        
+        ttk.Button(frame_algoritmo, text="Iniciar Simulación", command=self.iniciar_simulacion).grid(row=0, column=4, padx=10, pady=2)
+        
+        # --- Fila 2: Listas y Gráficas ---
+        main_frame.grid_rowconfigure(2, weight=1) # Permite la expansión de esta fila
+
+        frame_listas = ttk.Frame(main_frame)
+        frame_listas.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
+        frame_listas.grid_rowconfigure(1, weight=1) # Lista de Procesos Listos
+        frame_listas.grid_rowconfigure(3, weight=1) # Historial de Procesos Ejecutados
+
+        ttk.Label(frame_listas, text="Cola de Procesos Listos").grid(row=0, column=0, pady=2, sticky="ew")
+        self.lista_procesos_cola = tk.Listbox(frame_listas, height=10, width=50) 
+        # [CORREGIDO] Error de grid: usar fill=tk.BOTH y expand=True en .grid() solo si no hay weight=1
+        self.lista_procesos_cola.grid(row=1, column=0, sticky="nsew", padx=5, pady=2) 
+        
+        ttk.Label(frame_listas, text="Historial de Procesos Ejecutados").grid(row=2, column=0, pady=2, sticky="ew")
+        self.lista_procesos_historial = tk.Listbox(frame_listas, height=10) 
+        self.lista_procesos_historial.grid(row=3, column=0, sticky="nsew", padx=5, pady=2)
+        
+        frame_metricas_y_gantt = ttk.Frame(main_frame)
+        frame_metricas_y_gantt.grid(row=2, column=1, padx=5, pady=5, sticky="nsew")
+        
+        # Ajuste de peso para que el canvas del Gantt y Histograma se expanda
+        frame_metricas_y_gantt.grid_rowconfigure(0, weight=0) # Título Métricas
+        frame_metricas_y_gantt.grid_rowconfigure(1, weight=0) # Retorno Promedio
+        frame_metricas_y_gantt.grid_rowconfigure(2, weight=0) # Espera Promedio
+        frame_metricas_y_gantt.grid_rowconfigure(3, weight=0) # Índice de Servicio Promedio (Nuevo)
+        frame_metricas_y_gantt.grid_rowconfigure(4, weight=1) # Canvas de Matplotlib (DEBE expandirse)
+
+        ttk.Label(frame_metricas_y_gantt, text="Métricas de Rendimiento", font=('Arial', 10, 'bold')).grid(row=0, column=0, pady=(5,2), sticky="w")
+        
+        self.label_tiempo_retorno_promedio = ttk.Label(frame_metricas_y_gantt, text="Tiempo de Retorno Promedio: 0.00")
+        self.label_tiempo_retorno_promedio.grid(row=1, column=0, pady=1, sticky="w")
+        
+        self.label_tiempo_espera_promedio = ttk.Label(frame_metricas_y_gantt, text="Tiempo de Espera Promedio: 0.00")
+        self.label_tiempo_espera_promedio.grid(row=2, column=0, pady=1, sticky="w")
+
+        # [AÑADIDO] Etiqueta para el Índice de Servicio Promedio
+        self.label_indice_servicio_promedio = ttk.Label(frame_metricas_y_gantt, text="Índice de Servicio Promedio: 0.00")
+        self.label_indice_servicio_promedio.grid(row=3, column=0, pady=1, sticky="w")
+        
+        self.canvas_gantt = FigureCanvasTkAgg(self.fig, master=frame_metricas_y_gantt)
+        self.canvas_gantt_widget = self.canvas_gantt.get_tk_widget()
+        # [CORREGIDO] El canvas está ahora en la fila 4 y se expande
+        self.canvas_gantt_widget.grid(row=4, column=0, sticky="nsew")
+
+
+        # --- Fila 3: Tabla de Métricas por Proceso (Cuadrícula) ---
+        frame_tabla_detallada = ttk.LabelFrame(main_frame, text="Métricas por Proceso (Procedimiento en Cuadrícula)", padding="10")
+        frame_tabla_detallada.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+
+        columnas = ("proceso", "llegada", "cpu", "finalizacion", "retorno", "espera", "servicio")
+        
+        self.treeview_metricas_por_proceso = ttk.Treeview(frame_tabla_detallada, columns=columnas, show='headings', height=5)
+        
+        # Definición de cabeceras (similar a la imagen de referencia)
+        self.treeview_metricas_por_proceso.heading("proceso", text="Proceso")
+        self.treeview_metricas_por_proceso.heading("llegada", text="Instante de llegada ($T_l$)")
+        self.treeview_metricas_por_proceso.heading("cpu", text="Tiempo en CPU ($T_{CPU}$)")
+        self.treeview_metricas_por_proceso.heading("finalizacion", text="Instante de finalización ($T_f$)")
+        self.treeview_metricas_por_proceso.heading("retorno", text="Tiempo de retorno ($T_r = T_f - T_l$)")
+        self.treeview_metricas_por_proceso.heading("espera", text="Tiempo de espera ($T_e$)")
+        self.treeview_metricas_por_proceso.heading("servicio", text="Índice de servicio ($I = T_{CPU}/T_r$)")
+
+        # Configuración de ancho de columnas
+        self.treeview_metricas_por_proceso.column("proceso", width=60, anchor='center')
+        self.treeview_metricas_por_proceso.column("llegada", width=120, anchor='center')
+        self.treeview_metricas_por_proceso.column("cpu", width=120, anchor='center')
+        self.treeview_metricas_por_proceso.column("finalizacion", width=150, anchor='center')
+        self.treeview_metricas_por_proceso.column("retorno", width=150, anchor='center')
+        self.treeview_metricas_por_proceso.column("espera", width=120, anchor='center')
+        self.treeview_metricas_por_proceso.column("servicio", width=150, anchor='center')
+        
+        self.treeview_metricas_por_proceso.pack(fill=tk.BOTH, expand=True)
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = SimuladorApp(root)
+    root.mainloop()
+
+
+
+Clase proceso
+# proceso.py
+import math
+
+class Proceso:
+    siguiente_pid = 1
+    
+    def __init__(self, nombre, tiempo_cpu, instante_llegada):
+        self.pid = Proceso.siguiente_pid
+        Proceso.siguiente_pid += 1
+        self.nombre = nombre
+        self.tiempo_cpu_total = tiempo_cpu       # Tiempo de CPU original requerido (T_CPU)
+        self.instante_llegada = instante_llegada # Instante de llegada (T_l)
+        self.tiempo_restante = tiempo_cpu        # Tiempo de CPU restante para la simulación
+        
+        self.tiempo_inicio_ejecucion = -1
+        self.tiempo_finalizacion = -1            # Instante de finalización (T_f)
+        
+        self.tiempo_retorno = 0                  # Tiempo de retorno (T_r)
+        self.tiempo_espera = 0                   # Tiempo de espera (T_e)
+        self.indice_servicio = 0.0               # Índice de servicio (I)
+
+    def calcular_metricas(self):
+        """Calcula el tiempo de retorno, espera e índice de servicio una vez finalizado el proceso."""
+        
+        if self.tiempo_finalizacion > -1:
+            # T_r = T_f - T_l
+            self.tiempo_retorno = self.tiempo_finalizacion - self.instante_llegada
+            
+            # T_e = T_r - T_CPU
+            self.tiempo_espera = self.tiempo_retorno - self.tiempo_cpu_total
+            if self.tiempo_espera < 0: # Para evitar errores de redondeo o lógica, aunque no debería ser negativo
+                self.tiempo_espera = 0
+            
+            # I = T_CPU / T_r
+            if self.tiempo_retorno > 0: 
+                self.indice_servicio = self.tiempo_cpu_total / self.tiempo_retorno
+            else:
+                self.indice_servicio = 0.0
+
+# Restablecer el contador de PID después de la definición, listo para ser importado
+Proceso.siguiente_pid = 1
+
+
+
+Clase simulador
+# simulador.py
+import math
+# Asume que la clase Proceso está en el archivo proceso.py
+from proceso import Proceso 
+
+class Simulador:
+    """Clase principal del simulador de planificación de procesos."""
+
+    def __init__(self):
+        self.cola_llegadas = []
+        self.historial_ejecucion = []
+        self.historial_ejecucion_visual = {} # {tiempo: nombre_proceso}
+
+    def agregar_proceso(self, nombre, tiempo_cpu, instante_llegada):
+        # NOTA: Al agregar un proceso, la clase Proceso maneja la asignación de PID.
+        proceso = Proceso(nombre, tiempo_cpu, instante_llegada)
+        self.cola_llegadas.append(proceso)
+
+    def _reset_simulacion(self):
+        """Prepara el simulador para una nueva ejecución, clonando los procesos y reiniciando el estado."""
+        self.historial_ejecucion = []
+        self.historial_ejecucion_visual = {}
+        
+        # Clonar procesos para que los originales en cola_llegadas no se alteren
+        procesos_clonados = []
+        Proceso.siguiente_pid = 1 # Resetear el contador de PID antes de clonar
+        for p in self.cola_llegadas:
+            # Crea una nueva instancia de Proceso con los datos originales
+            proceso_clon = Proceso(p.nombre, p.tiempo_cpu_total, p.instante_llegada)
+            procesos_clonados.append(proceso_clon)
+            
+        # Ordenar los procesos por llegada para la simulación
+        procesos_clonados.sort(key=lambda p: p.instante_llegada)
+        return procesos_clonados
+    
+    # [MODIFICACIÓN CLAVE]: Devuelve los 3 promedios, incluyendo el Índice de Servicio.
+    def calcular_metricas(self):
+        """Calcula las métricas promedio a partir de los procesos terminados, incluyendo el índice de servicio."""
+        
+        for p in self.historial_ejecucion:
+            p.calcular_metricas() # Aseguramos que el índice individual esté calculado
+             
+        total_tiempo_retorno = sum(p.tiempo_retorno for p in self.historial_ejecucion)
+        total_tiempo_espera = sum(p.tiempo_espera for p in self.historial_ejecucion)
+        total_indice_servicio = sum(p.indice_servicio for p in self.historial_ejecucion)
+        
+        num_procesos = len(self.historial_ejecucion)
+        
+        promedio_retorno = total_tiempo_retorno / num_procesos if num_procesos > 0 else 0
+        promedio_espera = total_tiempo_espera / num_procesos if num_procesos > 0 else 0
+        promedio_indice_servicio = total_indice_servicio / num_procesos if num_procesos > 0 else 0
+        
+        # [CORREGIDO] Retorna los 3 valores: Retorno, Espera, Índice de Servicio
+        return promedio_retorno, promedio_espera, promedio_indice_servicio
+
+    # ------------------ ALGORITMOS NO PREVENTIVOS (FCFS, SJF) ------------------
+
+    def ejecutar_fcfs(self):
+        procesos_para_simular = self._reset_simulacion()
+        tiempo_actual = 0
+        
+        cola_listos = procesos_para_simular 
+        
+        while cola_listos:
+            proceso_actual = cola_listos.pop(0)
+
+            if tiempo_actual < proceso_actual.instante_llegada:
+                self.historial_ejecucion_visual.update({i: "Inactivo" for i in range(tiempo_actual, proceso_actual.instante_llegada)})
+                tiempo_actual = proceso_actual.instante_llegada
+
+            proceso_actual.tiempo_inicio_ejecucion = tiempo_actual
+            inicio_ejecucion = tiempo_actual
+            tiempo_actual += proceso_actual.tiempo_cpu_total # Uso de tiempo_cpu_total
+            
+            proceso_actual.tiempo_finalizacion = tiempo_actual
+            proceso_actual.calcular_metricas() 
+            
+            self.historial_ejecucion.append(proceso_actual)
+            self.historial_ejecucion_visual.update({i: proceso_actual.nombre for i in range(inicio_ejecucion, proceso_actual.tiempo_finalizacion)})
+
+    def ejecutar_sjf(self):
+        procesos_para_simular = self._reset_simulacion()
+        tiempo_actual = 0
+        procesos_pendientes = procesos_para_simular
+        cola_listos = []
+        
+        while procesos_pendientes or cola_listos:
+            while procesos_pendientes and procesos_pendientes[0].instante_llegada <= tiempo_actual:
+                cola_listos.append(procesos_pendientes.pop(0))
+                
+            if cola_listos:
+                # SJF ordena por tiempo_cpu_total
+                cola_listos.sort(key=lambda p: (p.tiempo_cpu_total, p.instante_llegada))
+                proceso_ejecutandose = cola_listos.pop(0)
+
+                if tiempo_actual < proceso_ejecutandose.instante_llegada:
+                    self.historial_ejecucion_visual.update({i: "Inactivo" for i in range(tiempo_actual, proceso_ejecutandose.instante_llegada)})
+                    tiempo_actual = proceso_ejecutandose.instante_llegada
+
+                proceso_ejecutandose.tiempo_inicio_ejecucion = tiempo_actual
+                inicio_ejecucion = tiempo_actual
+                tiempo_actual += proceso_ejecutandose.tiempo_cpu_total # Uso de tiempo_cpu_total
+                
+                proceso_ejecutandose.tiempo_finalizacion = tiempo_actual
+                proceso_ejecutandose.calcular_metricas()
+
+                self.historial_ejecucion.append(proceso_ejecutandose)
+                self.historial_ejecucion_visual.update({i: proceso_ejecutandose.nombre for i in range(inicio_ejecucion, proceso_ejecutandose.tiempo_finalizacion)})
+            else:
+                if procesos_pendientes:
+                    tiempo_siguiente_llegada = procesos_pendientes[0].instante_llegada
+                    self.historial_ejecucion_visual.update({i: "Inactivo" for i in range(tiempo_actual, tiempo_siguiente_llegada)})
+                    tiempo_actual = tiempo_siguiente_llegada
+                else:
+                    break
+
+    # ------------------ ALGORITMOS PREVENTIVOS (SRTF, Round Robin) ------------------
+    
+    def ejecutar_srtf(self):
+        procesos_para_simular = self._reset_simulacion()
+        tiempo_actual = 0
+        procesos_pendientes = procesos_para_simular
+        cola_listos = []
+        proceso_ejecutandose = None
+
+        while procesos_pendientes or cola_listos or proceso_ejecutandose:
+            while procesos_pendientes and procesos_pendientes[0].instante_llegada <= tiempo_actual:
+                cola_listos.append(procesos_pendientes.pop(0))
+            
+            if proceso_ejecutandose and proceso_ejecutandose.tiempo_restante > 0:
+                cola_listos.append(proceso_ejecutandose)
+                
+            proximo_proceso_elegido = None
+            if cola_listos:
+                cola_listos.sort(key=lambda p: (p.tiempo_restante, p.instante_llegada))
+                proximo_proceso_elegido = cola_listos.pop(0)
+
+            proceso_ejecutandose = proximo_proceso_elegido
+            
+            if proceso_ejecutandose is None:
+                if procesos_pendientes:
+                    tiempo_siguiente_llegada = procesos_pendientes[0].instante_llegada
+                    self.historial_ejecucion_visual.update({i: "Inactivo" for i in range(tiempo_actual, tiempo_siguiente_llegada)})
+                    tiempo_actual = tiempo_siguiente_llegada
+                    continue
+                else:
+                    break
+            
+            if proceso_ejecutandose.tiempo_inicio_ejecucion == -1:
+                proceso_ejecutandose.tiempo_inicio_ejecucion = tiempo_actual 
+
+            self.historial_ejecucion_visual[tiempo_actual] = proceso_ejecutandose.nombre
+            proceso_ejecutandose.tiempo_restante -= 1
+            
+            if proceso_ejecutandose.tiempo_restante == 0:
+                proceso_ejecutandose.tiempo_finalizacion = tiempo_actual + 1
+                proceso_ejecutandose.calcular_metricas()
+                self.historial_ejecucion.append(proceso_ejecutandose)
+                proceso_ejecutandose = None
+            
+            tiempo_actual += 1
+
+
+    def ejecutar_round_robin(self, quantum):
+        procesos_para_simular = self._reset_simulacion()
+        tiempo_actual = 0
+        procesos_pendientes = procesos_para_simular
+        cola_rr = []
+
+        while procesos_pendientes or cola_rr:
+            while procesos_pendientes and procesos_pendientes[0].instante_llegada <= tiempo_actual:
+                cola_rr.append(procesos_pendientes.pop(0))
+            
+            if not cola_rr:
+                if procesos_pendientes:
+                    tiempo_siguiente_llegada = procesos_pendientes[0].instante_llegada
+                    self.historial_ejecucion_visual.update({i: "Inactivo" for i in range(tiempo_actual, tiempo_siguiente_llegada)})
+                    tiempo_actual = tiempo_siguiente_llegada
+                    continue
+                else:
+                    break
+
+            proceso_actual = cola_rr.pop(0)
+            tiempo_ejecucion = min(proceso_actual.tiempo_restante, quantum)
+
+            if proceso_actual.tiempo_inicio_ejecucion == -1:
+                proceso_actual.tiempo_inicio_ejecucion = tiempo_actual
+            
+            for _ in range(tiempo_ejecucion):
+                self.historial_ejecucion_visual[tiempo_actual] = proceso_actual.nombre
+                tiempo_actual += 1
+                proceso_actual.tiempo_restante -= 1
+                
+                while procesos_pendientes and procesos_pendientes[0].instante_llegada == tiempo_actual:
+                    cola_rr.append(procesos_pendientes.pop(0))
+
+            if proceso_actual.tiempo_restante == 0:
+                proceso_actual.tiempo_finalizacion = tiempo_actual
+                proceso_actual.calcular_metricas()
+                self.historial_ejecucion.append(proceso_actual)
+            else:
+                cola_rr.append(proceso_actual)
