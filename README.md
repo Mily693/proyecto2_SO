@@ -65,4 +65,10 @@ Este proyecto es una herramienta de simulación con una interfaz gráfica (GUI) 
 **4. Observar resultados:**
   - Visualiza la ejecución en tiempo discreto (cada unidad = 5 segundos).
   - Revisa el historial de procesos finalizados.
-<img width="1354" height="724" alt="Captura de pantalla (693)" src="https://github.com/user-attachments/assets/8802bf2a-f8d5-41cd-93b3-6dc0b54e797d" />
+
+<img width="1358" height="698" alt="Captura de pantalla (1270)" src="https://github.com/user-attachments/assets/5f1832ea-59dc-4594-992d-d546798b00d5" />
+
+<img width="1357" height="693" alt="Captura de pantalla (1285)" src="https://github.com/user-attachments/assets/85954480-5e8d-4281-aa1b-4bb2e29a10e5" />
+
+<img width="1142" height="754" alt="Captura de pantalla (1286)" src="https://github.com/user-attachments/assets/cf77f063-0d49-4cad-b101-11ab2151ffac" />
+
